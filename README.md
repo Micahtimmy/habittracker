@@ -1,104 +1,180 @@
-# 🔥 StreakKeeper - Full-Stack Habit Tracker
+<div align="center">
 
-StreakKeeper is a modern, responsive full-stack habit tracking web application designed to help users build unstoppable daily momentum.
+# 🔥 StreakKeeper
+
+**A modern, full-stack habit tracker designed to help you build unstoppable daily momentum.**
+
+[![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.x-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-Native_WAL-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org/)
+[![Vitest](https://img.shields.io/badge/Vitest-3.x-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+
+</div>
 
 ---
 
-## 🛠️ Technology Stack
+## ✨ Features
 
-- **Frontend**: React 18, Vite, TailwindCSS, Lucide Icons
-- **Backend**: Node.js (v22+ / v24+), Express.js, native `node:sqlite` SQLite database engine
-- **Authentication**: JWT (JSON Web Tokens) with `bcryptjs` password hashing (salt rounds: 10)
-- **Testing**: Vitest for backend unit & integration tests, Playwright for end-to-end browser flows
+- ⚡ **Instant Habit Check-ins**: One-click completion toggling with zero latency and optimistic UI feedback.
+- 🔥 **Intelligent Streak Engine**: Automated streak tracking with timezone-safe calculations, yesterday grace periods, and reset protection.
+- 📊 **30-Day Activity Heatmaps**: Interactive GitHub-style visual heatmaps for every habit showing daily consistency.
+- 📈 **Performance Dashboard**: Real-time stats including total habits, today's completion progress bar, active streaks count, and personal best records.
+- 🛡️ **Secure JWT Authentication**: Stateless session authentication with `bcryptjs` salt hashing and strict cross-user tenant boundary enforcement.
+- 💎 **Sleek Glassmorphism Design**: Tailored dark-mode UI with smooth micro-animations, glowing accent pills, and responsive layouts across mobile, tablet, and desktop.
+- 🧪 **100% Tested**: Comprehensive test coverage across pure unit math (Vitest), integration endpoints (Supertest), and full browser journeys (Playwright).
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+### **Frontend**
+- **Core**: React 18 SPA built with Vite
+- **Styling**: Tailwind CSS, custom glassmorphism effects, Lucide React icons
+- **State & Routing**: React Context API (`AuthContext`), declarative protected routing, session hydration
+
+### **Backend**
+- **Runtime**: Node.js (v22+ / v24+) with native ES Modules
+- **Framework**: Express.js REST API
+- **Database**: Native `node:sqlite` (`DatabaseSync`) in Write-Ahead Logging (`WAL`) mode with foreign key cascade support
+- **Auth & Crypto**: JSON Web Tokens (JWT) + `bcryptjs` (salt factor 10)
+
+### **Testing & Automation**
+- **Backend Tests**: Vitest (26 unit & integration tests)
+- **E2E Browser Automation**: Playwright (multi-step lifecycle validation)
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js version 22 or 24 (or higher)
-- npm version 9+
+- [Node.js](https://nodejs.org/) v22.x or v24.x (or higher)
+- npm v9+
 
-### 1. Install Dependencies
-Run the install command across all workspace packages:
+### 1. Clone & Install Dependencies
 ```bash
-# In the project root:
+git clone https://github.com/Micahtimmy/habittracker.git
+cd habittracker
 npm run install:all
 ```
-*(Alternatively: `npm install`, `cd server && npm install`, `cd ../client && npm install`)*
 
-### 2. Run the Full Application (Dev Mode)
+### 2. (Optional) Seed Demo Data
+Populate the database with a pre-configured demo user and active streaks:
+```bash
+node seed_demo.js
+```
+> **Demo Account Credentials:**
+> - **Email**: `demo@streakkeeper.com`
+> - **Password**: `Password123!`
+
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
-This starts both services concurrently:
+This concurrently boots:
 - **Backend API**: `http://localhost:5000`
-- **Frontend App**: `http://localhost:5173`
+- **Frontend Client**: `http://localhost:5173`
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 🔐 How Auth Tokens Are Handled
+## 📡 REST API Reference
 
-1. **Password Security**: Passwords must be at least 8 characters. Passwords are never stored in plaintext — they are hashed using `bcryptjs` with salt factor 10 before saving to SQLite.
-2. **JWT Generation**: On successful signup or login (`/api/auth/signup`, `/api/auth/login`), the backend signs a JSON Web Token containing `{ id, email }` with a 7-day expiration (`JWT_EXPIRES_IN=7d`).
-3. **Client Storage & Header Attachment**: The frontend stores the JWT in `localStorage` under `streakkeeper_token`. Every outgoing authenticated API request attaches the token in the standard HTTP header:
-   ```http
-   Authorization: Bearer <token>
-   ```
-4. **Session Hydration & Verification**: On page refresh, the frontend calls `GET /api/auth/me` with the stored token to verify session validity.
-5. **Logout**: Logging out removes the token from `localStorage` and resets the client-side authentication state.
+All protected endpoints require `Authorization: Bearer <token>`.
+
+### **Authentication Endpoints**
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :---: |
+| `POST` | `/api/auth/signup` | Register a new user (`email`, `password`) | ❌ |
+| `POST` | `/api/auth/login` | Authenticate user and receive JWT | ❌ |
+| `GET` | `/api/auth/me` | Hydrate user session from token | ✅ |
+
+### **Habits & Tracking Endpoints**
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/habits?date=YYYY-MM-DD` | Fetch all user habits with streaks & 30-day heatmap | ✅ |
+| `POST` | `/api/habits` | Create a new habit (`name`, `description`) | ✅ |
+| `DELETE` | `/api/habits/:id` | Delete habit and cascade delete check-ins | ✅ |
+| `POST` | `/api/habits/:id/checkin` | Check in habit for date (`{ date: "YYYY-MM-DD" }`) | ✅ |
+| `DELETE` | `/api/habits/:id/checkin` | Remove check-in for date (`{ date: "YYYY-MM-DD" }`) | ✅ |
 
 ---
 
-## 📈 Streak & Heatmap Rules
+## 🗄️ Database Schema
 
-- **Current Streak**: The number of consecutive calendar days with a check-in ending on either **Today** or **Yesterday**.
-  - If you check in today after yesterday's check-in, the streak increments.
-  - If you haven't checked in today yet, your streak remains active based on yesterday's completion.
-  - If neither today nor yesterday has a check-in, the streak resets to `0`.
-- **30-Day Activity Heatmap**: Displays an interactive calendar grid representing the last 30 consecutive days up to today.
+```sql
+-- Users Table
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Habits Table
+CREATE TABLE habits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Checkins Table
+CREATE TABLE checkins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  habit_id INTEGER NOT NULL,
+  checkin_date TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(habit_id, checkin_date),
+  FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE
+);
+```
 
 ---
 
-## 🧪 Running Automated Tests
+## 🧪 Testing
 
 ### Backend Unit & Integration Tests (Vitest)
 ```bash
 npm run test
 ```
 Tests cover:
-- Pure streak calculation math across consecutive, broken, and backdated check-ins.
-- User signup validation (email regex, password length, duplicate email prevention).
-- Authentication, login failure cases, and session verification.
-- Habit CRUD and daily check-ins.
-- Strict cross-user isolation: User A cannot fetch, check-in to, or delete User B's habits.
+- Mathematical edge cases in streak calculations (consecutive, broken, backdated check-ins).
+- Auth payload validation (email format, min 8-char password, duplicate email rejection).
+- Habit lifecycle and cascade deletions.
+- Cross-user tenant boundary enforcement (User A cannot access or mutate User B's habits).
 
-### End-to-End Browser Tests (Playwright)
+### End-to-End Browser Automation (Playwright)
 ```bash
+# Run headless browser tests
 npm run test:e2e
+
+# Run with interactive UI debugger
+npx playwright test --ui
 ```
-Playwright verifies the complete end-to-end journey:
-1. Signup with new credentials
-2. Landing on protected Dashboard
-3. Habit creation
-4. Daily check-in (streak becomes 1 day)
-5. Unchecking (streak updates to 0)
-6. Logging out and logging back in with data persistence
 
 ---
 
 ## 📂 Project Structure
 
-```
+```text
+habittracker/
 ├── client/                     # React + Vite + Tailwind frontend
 │   ├── src/
-│   │   ├── components/         # Navbar, HabitCard, Heatmap, AddHabitModal, ProtectedRoute
+│   │   ├── components/         # HabitCard, Heatmap, AddHabitModal, Navbar, ProtectedRoute
 │   │   ├── context/            # AuthContext (state & session hydration)
 │   │   ├── pages/              # DashboardPage, LoginPage, SignupPage
 │   │   ├── services/           # api.js fetch client
-│   │   ├── App.jsx             # Main router & layout
+│   │   ├── App.jsx             # Root router & layout
 │   │   ├── index.css           # Tailwind & glassmorphism theme
 │   │   └── main.jsx
 │   └── vite.config.js          # API proxy to localhost:5000
@@ -109,13 +185,20 @@ Playwright verifies the complete end-to-end journey:
 │   │   ├── middleware/auth.js  # JWT Bearer token authentication
 │   │   ├── routes/             # auth.js & habits.js
 │   │   ├── utils/streak.js     # Pure streak & heatmap logic
-│   │   ├── app.js              # Express app configuration
+│   │   ├── app.js              # Express app setup
 │   │   └── index.js            # Server listener
 │   └── tests/                  # Vitest unit & integration test suites
 │
 ├── e2e/                        # Playwright end-to-end browser tests
 │   └── streakkeeper.spec.js
-├── streakkeeper.db             # Persistent SQLite database file
-├── package.json                # Orchestration scripts (concurrently dev, test)
+├── seed_demo.js                # Demo database seeder
+├── playwright.config.js        # Playwright E2E configuration
+├── package.json                # Project root orchestration scripts
 └── README.md
 ```
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
