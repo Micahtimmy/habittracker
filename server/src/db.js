@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -13,7 +14,13 @@ export function initDatabase(dbPath = null) {
   }
 
   const defaultPath = path.resolve(__dirname, '../../streakkeeper.db');
-  const targetPath = dbPath || defaultPath;
+  const targetPath = dbPath || process.env.DB_PATH || defaultPath;
+
+  const dir = path.dirname(targetPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   const db = new DatabaseSync(targetPath);
 
   // Enable WAL mode and foreign key enforcement

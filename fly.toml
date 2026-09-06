@@ -1,0 +1,29 @@
+# fly.toml app configuration file generated for StreakKeeper
+app = "streakkeeper-app"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "5000"
+  DB_PATH = "/data/streakkeeper.db"
+
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[mounts]]
+  source = "streakkeeper_data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
