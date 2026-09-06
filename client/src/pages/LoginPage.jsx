@@ -69,6 +69,7 @@ export default function LoginPage({ onNavigateSignup }) {
                   id="login-email"
                   type="email"
                   required
+                  maxLength={254}
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -89,6 +90,7 @@ export default function LoginPage({ onNavigateSignup }) {
                   id="login-password"
                   type="password"
                   required
+                  maxLength={128}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

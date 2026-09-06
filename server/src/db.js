@@ -23,9 +23,11 @@ export function initDatabase(dbPath = null) {
 
   const db = new DatabaseSync(targetPath);
 
-  // Enable WAL mode and foreign key enforcement
+  // Enable WAL mode, normal synchronous, busy timeout, and foreign key enforcement
   try {
     db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA synchronous = NORMAL;');
+    db.exec('PRAGMA busy_timeout = 5000;');
   } catch (e) {}
   db.exec('PRAGMA foreign_keys = ON;');
 
@@ -63,6 +65,13 @@ export function initDatabase(dbPath = null) {
     );
   `);
 
+  // Performance Indexes for Fast Lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id);
+    CREATE INDEX IF NOT EXISTS idx_checkins_habit ON checkins(habit_id);
+    CREATE INDEX IF NOT EXISTS idx_checkins_habit_date ON checkins(habit_id, checkin_date);
+  `);
+
   defaultDb = db;
   return db;
 }
@@ -86,8 +95,12 @@ export function clearDatabase(db = null) {
 export function closeDb() {
   if (defaultDb) {
     try {
+      // Checkpoint WAL to flush all transactions to main database file
+      defaultDb.exec('PRAGMA wal_checkpoint(TRUNCATE);');
       defaultDb.close();
-    } catch (e) {}
+    } catch (e) {
+      console.error('Error during database close:', e);
+    }
     defaultDb = null;
   }
 }

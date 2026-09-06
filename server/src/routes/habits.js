@@ -1,20 +1,18 @@
 import express from 'express';
 import { getDb } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { calculateStreak, get30DayHeatmap, formatDate } from '../utils/streak.js';
+import { calculateStreak, get30DayHeatmap, formatDate, isValidDateString, parseLocalDate } from '../utils/streak.js';
 
 export const habitsRouter = express.Router();
+
+const MAX_NAME_LENGTH = 100;
+const MAX_DESCRIPTION_LENGTH = 500;
 
 // Apply auth middleware to all habit routes
 habitsRouter.use(authenticateToken);
 
-// Helper to format habit with streak and history
-function formatHabitRecord(db, habit, refDate = new Date()) {
-  const checkinRows = db
-    .prepare('SELECT checkin_date FROM checkins WHERE habit_id = ? ORDER BY checkin_date ASC')
-    .all(habit.id);
-
-  const checkinDates = checkinRows.map((row) => row.checkin_date);
+// Helper to format a single habit record with pre-fetched checkin dates
+function formatHabitWithDates(habit, checkinDates = [], refDate = new Date()) {
   const currentStreak = calculateStreak(checkinDates, refDate);
   const history30Days = get30DayHeatmap(checkinDates, refDate);
   const todayStr = formatDate(refDate);
@@ -34,7 +32,7 @@ function formatHabitRecord(db, habit, refDate = new Date()) {
   };
 }
 
-// GET /api/habits - Fetch all habits for the logged-in user
+// GET /api/habits - Fetch all habits for the logged-in user (Batch query optimized)
 habitsRouter.get('/', (req, res) => {
   try {
     const db = getDb();
@@ -42,14 +40,42 @@ habitsRouter.get('/', (req, res) => {
       .prepare('SELECT * FROM habits WHERE user_id = ? ORDER BY created_at DESC')
       .all(req.user.id);
 
-    // Allow client to pass its local date query param ?date=YYYY-MM-DD for accurate timezone streak
-    let refDate = new Date();
-    if (req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) {
-      const [y, m, d] = req.query.date.split('-').map(Number);
-      refDate = new Date(y, m - 1, d);
+    if (habits.length === 0) {
+      return res.status(200).json({ habits: [] });
     }
 
-    const formattedHabits = habits.map((h) => formatHabitRecord(db, h, refDate));
+    // Parse and validate optional reference date for timezone consistency
+    let refDate = new Date();
+    if (req.query.date) {
+      if (!isValidDateString(req.query.date)) {
+        return res.status(400).json({ error: 'Invalid date format. Expected YYYY-MM-DD.' });
+      }
+      refDate = parseLocalDate(req.query.date);
+    }
+
+    // Batch query all checkins for the user's habits to prevent N+1 queries
+    const habitIds = habits.map((h) => h.id);
+    const placeholders = habitIds.map(() => '?').join(',');
+    const checkinRows = db
+      .prepare(`SELECT habit_id, checkin_date FROM checkins WHERE habit_id IN (${placeholders}) ORDER BY checkin_date ASC`)
+      .all(...habitIds);
+
+    // Group checkin dates by habit_id
+    const checkinMap = new Map();
+    for (const habitId of habitIds) {
+      checkinMap.set(habitId, []);
+    }
+    for (const row of checkinRows) {
+      const dates = checkinMap.get(row.habit_id);
+      if (dates) {
+        dates.push(row.checkin_date);
+      }
+    }
+
+    const formattedHabits = habits.map((habit) =>
+      formatHabitWithDates(habit, checkinMap.get(habit.id) || [], refDate)
+    );
+
     return res.status(200).json({ habits: formattedHabits });
   } catch (err) {
     console.error('Error fetching habits:', err);
@@ -67,9 +93,16 @@ habitsRouter.post('/', (req, res) => {
     }
 
     const trimmedName = name.trim();
-    const trimmedDesc = (description || '').trim();
-    const db = getDb();
+    if (trimmedName.length > MAX_NAME_LENGTH) {
+      return res.status(400).json({ error: `Habit name must not exceed ${MAX_NAME_LENGTH} characters.` });
+    }
 
+    const trimmedDesc = typeof description === 'string' ? description.trim() : '';
+    if (trimmedDesc.length > MAX_DESCRIPTION_LENGTH) {
+      return res.status(400).json({ error: `Habit description must not exceed ${MAX_DESCRIPTION_LENGTH} characters.` });
+    }
+
+    const db = getDb();
     const insertStmt = db.prepare(
       'INSERT INTO habits (user_id, name, description) VALUES (?, ?, ?)'
     );
@@ -77,7 +110,7 @@ habitsRouter.post('/', (req, res) => {
     const newHabitId = result.lastInsertRowid;
 
     const habit = db.prepare('SELECT * FROM habits WHERE id = ?').get(newHabitId);
-    const formatted = formatHabitRecord(db, habit);
+    const formatted = formatHabitWithDates(habit, [], new Date());
 
     return res.status(201).json({
       message: 'Habit created successfully.',
@@ -89,7 +122,7 @@ habitsRouter.post('/', (req, res) => {
   }
 });
 
-// DELETE /api/habits/:id - Delete a habit (and its checkin history via cascade)
+// DELETE /api/habits/:id - Delete a habit
 habitsRouter.delete('/:id', (req, res) => {
   try {
     const habitId = parseInt(req.params.id, 10);
@@ -98,7 +131,6 @@ habitsRouter.delete('/:id', (req, res) => {
     }
 
     const db = getDb();
-    // Enforce ownership: habit must belong to req.user.id
     const habit = db.prepare('SELECT * FROM habits WHERE id = ? AND user_id = ?').get(habitId, req.user.id);
     if (!habit) {
       return res.status(404).json({ error: 'Habit not found or you do not have permission to delete it.' });
@@ -122,15 +154,21 @@ habitsRouter.post('/:id/checkin', (req, res) => {
     }
 
     const db = getDb();
-    // Enforce ownership
     const habit = db.prepare('SELECT * FROM habits WHERE id = ? AND user_id = ?').get(habitId, req.user.id);
     if (!habit) {
       return res.status(404).json({ error: 'Habit not found or you do not have permission to modify it.' });
     }
 
-    const targetDate = req.body.date && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date)
-      ? req.body.date
-      : formatDate(new Date());
+    let targetDate = formatDate(new Date());
+    let refDate = new Date();
+
+    if (req.body.date) {
+      if (!isValidDateString(req.body.date)) {
+        return res.status(400).json({ error: 'Invalid date format. Expected YYYY-MM-DD.' });
+      }
+      targetDate = req.body.date;
+      refDate = parseLocalDate(req.body.date);
+    }
 
     // Insert or ignore if already checked in
     db.prepare(`
@@ -139,13 +177,12 @@ habitsRouter.post('/:id/checkin', (req, res) => {
       ON CONFLICT(habit_id, checkin_date) DO NOTHING
     `).run(habitId, targetDate);
 
-    let refDate = new Date();
-    if (req.body.date && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date)) {
-      const [y, m, d] = req.body.date.split('-').map(Number);
-      refDate = new Date(y, m - 1, d);
-    }
+    const checkinRows = db
+      .prepare('SELECT checkin_date FROM checkins WHERE habit_id = ? ORDER BY checkin_date ASC')
+      .all(habitId);
+    const checkinDates = checkinRows.map((r) => r.checkin_date);
 
-    const formatted = formatHabitRecord(db, habit, refDate);
+    const formatted = formatHabitWithDates(habit, checkinDates, refDate);
     return res.status(200).json({
       message: 'Check-in recorded successfully.',
       habit: formatted,
@@ -165,25 +202,31 @@ habitsRouter.delete('/:id/checkin', (req, res) => {
     }
 
     const db = getDb();
-    // Enforce ownership
     const habit = db.prepare('SELECT * FROM habits WHERE id = ? AND user_id = ?').get(habitId, req.user.id);
     if (!habit) {
       return res.status(404).json({ error: 'Habit not found or you do not have permission to modify it.' });
     }
 
-    const targetDate = (req.body.date || req.query.date) && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date || req.query.date)
-      ? (req.body.date || req.query.date)
-      : formatDate(new Date());
+    const rawDate = req.body.date || req.query.date;
+    let targetDate = formatDate(new Date());
+    let refDate = new Date();
+
+    if (rawDate) {
+      if (!isValidDateString(rawDate)) {
+        return res.status(400).json({ error: 'Invalid date format. Expected YYYY-MM-DD.' });
+      }
+      targetDate = rawDate;
+      refDate = parseLocalDate(rawDate);
+    }
 
     db.prepare('DELETE FROM checkins WHERE habit_id = ? AND checkin_date = ?').run(habitId, targetDate);
 
-    let refDate = new Date();
-    if (targetDate) {
-      const [y, m, d] = targetDate.split('-').map(Number);
-      refDate = new Date(y, m - 1, d);
-    }
+    const checkinRows = db
+      .prepare('SELECT checkin_date FROM checkins WHERE habit_id = ? ORDER BY checkin_date ASC')
+      .all(habitId);
+    const checkinDates = checkinRows.map((r) => r.checkin_date);
 
-    const formatted = formatHabitRecord(db, habit, refDate);
+    const formatted = formatHabitWithDates(habit, checkinDates, refDate);
     return res.status(200).json({
       message: 'Check-in removed successfully.',
       habit: formatted,

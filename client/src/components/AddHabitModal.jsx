@@ -70,6 +70,7 @@ export default function AddHabitModal({ isOpen, onClose, onCreate }) {
               id="habit-name"
               type="text"
               required
+              maxLength={100}
               placeholder="e.g. Read 20 pages, Morning Run, Meditate"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -80,11 +81,12 @@ export default function AddHabitModal({ isOpen, onClose, onCreate }) {
 
           <div>
             <label htmlFor="habit-desc" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-              Description <span className="text-slate-500 text-[10px] lowercase">(optional)</span>
+              Description <span className="text-slate-500 text-[10px] lowercase">(optional, max 500 chars)</span>
             </label>
             <textarea
               id="habit-desc"
               rows={3}
+              maxLength={500}
               placeholder="Why is this habit important to you?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}

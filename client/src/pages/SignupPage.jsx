@@ -78,6 +78,7 @@ export default function SignupPage({ onNavigateLogin }) {
                   id="signup-email"
                   type="email"
                   required
+                  maxLength={254}
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -98,6 +99,7 @@ export default function SignupPage({ onNavigateLogin }) {
                   id="signup-password"
                   type="password"
                   required
+                  maxLength={128}
                   placeholder="Min 8 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

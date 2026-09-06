@@ -27,9 +27,17 @@ COPY server/src ./src
 # Copy built frontend assets from builder stage
 COPY --from=client-builder /app/client/dist /app/client/dist
 
-# Create persistent data directory for SQLite
-RUN mkdir -p /data
+# Install su-exec for safe privilege dropping
+RUN apk add --no-cache su-exec
+
+# Copy entrypoint script and set permissions
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Create persistent data directory for SQLite and set initial ownership
+RUN mkdir -p /data && chown -R node:node /data /app
 
 EXPOSE 5000
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "src/index.js"]

@@ -1,6 +1,15 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'streakkeeper-super-secret-jwt-key-2026';
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ [SECURITY WARNING]: JWT_SECRET environment variable is not set in production. Using fallback secret.');
+    }
+    return 'streakkeeper-super-secret-jwt-key-2026';
+  }
+  return secret;
+}
 
 export function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -11,8 +20,11 @@ export function authenticateToken(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // Contains { id, email }
+    const decoded = jwt.verify(token, getJwtSecret());
+    if (!decoded || !decoded.id || !decoded.email) {
+      return res.status(401).json({ error: 'Invalid token payload.' });
+    }
+    req.user = { id: decoded.id, email: decoded.email };
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired authentication token.' });
@@ -22,7 +34,7 @@ export function authenticateToken(req, res, next) {
 export function generateToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 }

@@ -32,6 +32,11 @@ async function apiRequest(endpoint, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    if (response.status === 401 && endpoint !== '/auth/login' && endpoint !== '/auth/signup') {
+      localStorage.removeItem('streakkeeper_token');
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    }
+
     const errorMsg = data.error || data.message || `Request failed with status ${response.status}`;
     const error = new Error(errorMsg);
     error.status = response.status;

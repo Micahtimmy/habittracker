@@ -1,23 +1,64 @@
 /**
+ * Validates whether a string is a real, valid Gregorian date in YYYY-MM-DD format
+ * between years 2000 and 2100.
+ * @param {string} dateStr
+ * @returns {boolean}
+ */
+export function isValidDateString(dateStr) {
+  if (typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return false;
+  }
+
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) {
+    return false;
+  }
+
+  // Verify calendar rollover (e.g., Feb 31 or April 31)
+  const testDate = new Date(y, m - 1, d, 12, 0, 0);
+  return (
+    testDate.getFullYear() === y &&
+    testDate.getMonth() === m - 1 &&
+    testDate.getDate() === d
+  );
+}
+
+/**
+ * Parses a YYYY-MM-DD string into a Date object anchored at 12:00:00 (noon)
+ * to prevent daylight saving time shift issues.
+ * @param {string} dateStr
+ * @returns {Date}
+ */
+export function parseLocalDate(dateStr) {
+  if (isValidDateString(dateStr)) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+}
+
+/**
  * Formats a Date object as YYYY-MM-DD (local timezone)
  * @param {Date} date
  * @returns {string}
  */
 export function formatDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const d = date instanceof Date && !isNaN(date) ? date : new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
 /**
- * Adds or subtracts days from a given Date object and returns a new Date object
+ * Adds or subtracts days from a given Date object and returns a new Date object (DST safe at noon)
  * @param {Date} date
  * @param {number} days
  * @returns {Date}
  */
 export function shiftDays(date, days) {
-  const result = new Date(date);
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
   result.setDate(result.getDate() + days);
   return result;
 }
@@ -29,13 +70,14 @@ export function shiftDays(date, days) {
  * @returns {number} Current streak count
  */
 export function calculateStreak(checkinDates, referenceDate = new Date()) {
-  if (!checkinDates || checkinDates.length === 0) {
+  if (!Array.isArray(checkinDates) || checkinDates.length === 0) {
     return 0;
   }
 
   const dateSet = new Set(checkinDates);
-  const todayStr = formatDate(referenceDate);
-  const yesterdayDate = shiftDays(referenceDate, -1);
+  const safeRef = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 12, 0, 0);
+  const todayStr = formatDate(safeRef);
+  const yesterdayDate = shiftDays(safeRef, -1);
   const yesterdayStr = formatDate(yesterdayDate);
 
   const checkedToday = dateSet.has(todayStr);
@@ -47,7 +89,7 @@ export function calculateStreak(checkinDates, referenceDate = new Date()) {
   }
 
   let streak = 0;
-  let cursorDate = checkedToday ? referenceDate : yesterdayDate;
+  let cursorDate = checkedToday ? safeRef : yesterdayDate;
 
   while (true) {
     const cursorStr = formatDate(cursorDate);
@@ -70,14 +112,15 @@ export function calculateStreak(checkinDates, referenceDate = new Date()) {
  */
 export function get30DayHeatmap(checkinDates, referenceDate = new Date()) {
   const dateSet = new Set(checkinDates || []);
-  const todayStr = formatDate(referenceDate);
+  const safeRef = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 12, 0, 0);
+  const todayStr = formatDate(safeRef);
   const days = [];
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // Generate 30 days from 29 days ago up to today
   for (let i = 29; i >= 0; i--) {
-    const d = shiftDays(referenceDate, -i);
+    const d = shiftDays(safeRef, -i);
     const dateStr = formatDate(d);
     days.push({
       date: dateStr,

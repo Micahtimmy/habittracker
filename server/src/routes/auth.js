@@ -2,22 +2,26 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../db.js';
 import { authenticateToken, generateToken } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 
 export const authRouter = express.Router();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_EMAIL_LENGTH = 254;
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 128;
 
 // POST /api/auth/signup
-authRouter.post('/signup', async (req, res) => {
+authRouter.post('/signup', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !EMAIL_REGEX.test(email.trim())) {
-      return res.status(400).json({ error: 'Please provide a valid email address.' });
+    if (!email || typeof email !== 'string' || email.trim().length > MAX_EMAIL_LENGTH || !EMAIL_REGEX.test(email.trim())) {
+      return res.status(400).json({ error: 'Please provide a valid email address (max 254 characters).' });
     }
 
-    if (!password || typeof password !== 'string' || password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+    if (!password || typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters (and at most ${MAX_PASSWORD_LENGTH} characters) long.` });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -53,11 +57,11 @@ authRouter.post('/signup', async (req, res) => {
 });
 
 // POST /api/auth/login
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (!email || typeof email !== 'string' || email.trim().length > MAX_EMAIL_LENGTH || !password || typeof password !== 'string' || password.length > MAX_PASSWORD_LENGTH) {
       return res.status(400).json({ error: 'Please provide both email and password.' });
     }
 
