@@ -4,6 +4,7 @@
 
 **A modern, full-stack habit tracker designed to help you build unstoppable daily momentum.**
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-habittracker--7atdcg.fly.dev-FF5722?style=for-the-badge&logo=flydotio&logoColor=white)](https://habittracker-7atdcg.fly.dev)
 [![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
@@ -13,6 +14,8 @@
 [![Vitest](https://img.shields.io/badge/Vitest-3.x-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 [![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+
+🌐 **Live Deployment:** [https://habittracker-7atdcg.fly.dev](https://habittracker-7atdcg.fly.dev)
 
 </div>
 
